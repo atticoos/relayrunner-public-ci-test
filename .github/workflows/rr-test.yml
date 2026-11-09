@@ -1,0 +1,57 @@
+name: RelayRunner machine test
+
+# Asks the gateway where to run, then runs there. With a machine online on `relayrunner connect`,
+# the relay answers the route label `rr-<id>` and the `machine` job runs on that machine
+# (relayrunner/relayrunner#67). With none, it answers the `github` label, or the `blacksmith`
+# label when Blacksmith comes first in the workspace's runner order. The relay is
+# RelayRunner's reusable workflow (relayrunner/actions).
+# Pushes also run it, so a session without Actions write can test: put [mac] in the commit
+# message to offer machines, [blacksmith] to offer Blacksmith. GitHub-hosted is always offered.
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      machine:
+        description: The relay's machine input (none = don't use machines)
+        type: string
+        default: self-hosted
+      github:
+        description: The relay's github input (none = don't use GitHub-hosted)
+        type: string
+        default: ubuntu-latest
+      blacksmith:
+        description: The relay's blacksmith input (none = don't use Blacksmith)
+        type: string
+        default: blacksmith-2vcpu-ubuntu-2404
+
+jobs:
+  relay:
+    uses: relayrunner/actions/.github/workflows/relay.yml@v1.0.0-beta.4
+    with:
+      machine: ${{ github.event_name == 'push' && (contains(github.event.head_commit.message, '[mac]') && 'self-hosted' || '') || (inputs.machine != 'none' && inputs.machine || '') }}
+      github: ${{ github.event_name == 'push' && 'ubuntu-latest' || (inputs.github != 'none' && inputs.github || '') }}
+      blacksmith: ${{ github.event_name == 'push' && (contains(github.event.head_commit.message, '[blacksmith]') && 'blacksmith-2vcpu-ubuntu-2404' || '') || (inputs.blacksmith != 'none' && inputs.blacksmith || '') }}
+
+  machine:
+    needs: relay
+    runs-on: ${{ needs.relay.outputs.runner }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Report machine
+        env:
+          CHOSEN_RUNNER: ${{ needs.relay.outputs.runner }}
+        run: |
+          echo "Routed to: $CHOSEN_RUNNER"
+          echo "Runner name: $RUNNER_NAME"
+          uname -a
+          ls
+          {
+            echo "## RelayRunner route"
+            echo ""
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| Chosen runner | \`$CHOSEN_RUNNER\` |"
+            echo "| Runner | \`$RUNNER_NAME\` |"
+            echo "| OS | \`$(uname -sm)\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
