@@ -26,7 +26,7 @@ on:
 
 jobs:
   relay:
-    uses: relayrunner/actions/.github/workflows/relay.yml@v1.0.0-beta.4
+    uses: relayrunner/actions/.github/workflows/relay.yml@v1
     with:
       machine: ${{ github.event_name == 'push' && (contains(github.event.head_commit.message, '[mac]') && 'self-hosted' || '') || (inputs.machine != 'none' && inputs.machine || '') }}
       github: ${{ github.event_name == 'push' && 'ubuntu-latest' || (inputs.github != 'none' && inputs.github || '') }}
